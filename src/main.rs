@@ -49,23 +49,24 @@ fn main() -> Result<(), Box<Error>> {
                     .takes_value(true)
                     .required(true),
             )
+            .arg_from_usage("--clear-cache 'clear the project cache'")
         )
         .get_matches();
 
     if let Some(matches) = matches.subcommand_matches("get-slug") {
         let project_id = matches.value_of("project_id").unwrap();
-        let slug = get_slug(project_id)?;
+        let clear_cache = matches.is_present("clear-cache");
+        let slug = get_slug(project_id, clear_cache)?;
         println!("{}", slug);
     }
 
-    // get_cache()?;
     return Ok(());
 
 }
 
 
-fn get_slug(project_id: &str) -> Result<String, Box<Error>> {
-    let projects = get_projects()?;
+fn get_slug(project_id: &str, clear_cache: bool) -> Result<String, Box<Error>> {
+    let projects = get_projects(clear_cache)?;
 
     for project in projects.iter() {
         if project.id == project_id {
@@ -76,12 +77,19 @@ fn get_slug(project_id: &str) -> Result<String, Box<Error>> {
     Err("Project not found")?
 }
 
-
-fn get_projects() -> Result<Vec<Project>, Box<Error>> {
-    if let Ok(projects) = get_cache() {
-        return Ok(projects);
+fn get_projects(clear_cache: bool) -> Result<Vec<Project>, Box<Error>> {
+    if !clear_cache {
+        if let Ok(projects) = get_cache() {
+            return Ok(projects);
+        }
     }
+    let projects = get_projects_from_api()?;
+    set_cache(&projects)?;
+    Ok(projects)
+}
 
+
+fn get_projects_from_api() -> Result<Vec<Project>, Box<Error>> {
     let api_key = match env::var("SENTRY_APIKEY") {
         Ok(val) => Ok(val),
         Err(_) => Err("SENTRY_APIKEY missing"),
@@ -104,9 +112,8 @@ fn get_projects() -> Result<Vec<Project>, Box<Error>> {
         return Err(body.into());
     }
 
+    // res.json()?
     let projects: Vec<Project> = res.json()?;
-
-    set_cache(&projects)?;
     Ok(projects)
 }
 

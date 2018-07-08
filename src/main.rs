@@ -10,7 +10,7 @@ extern crate serde_derive;
 extern crate serde_json;
 
 use app_dirs::{AppInfo, AppDataType, app_dir, get_app_dir};
-use clap::{App, Arg, SubCommand};
+use clap::{App, Arg};
 use hyper::header::{Authorization, Bearer, Headers};
 use std::env;
 use std::error::Error;
@@ -18,7 +18,7 @@ use std::fs::File;
 use std::io::prelude::*;
 
 
-const APP_INFO: AppInfo = AppInfo{name: "sentry-api", author: "David Szotten"};
+const APP_INFO: AppInfo = AppInfo{name: crate_name!(), author: crate_authors!()};
 
 const SENTRY_ORG: &str = "org";
 const PROJECT_CACHE_FILENAME: &str = "projects.json";
@@ -35,22 +35,19 @@ struct Project {
 }
 
 fn main() -> Result<(), Box<Error>> {
-    let matches = App::new("Sentry api client")
+    let matches = App::new("Sentry project lookup")
         .version(crate_version!())
         .author(crate_authors!("\n"))
-        .about("Look up stuff using the sentry api")
-        .subcommand(SubCommand::with_name("get-slug")
-            .about("Find a project slug by id")
-            .arg(
-                Arg::with_name("project_id")
-                    .index(1)
-                    .value_name("PROJECT-ID")
-                    .help("The project id to look up")
-                    .takes_value(true)
-                    .required(true),
-            )
-            .arg_from_usage("--clear-cache 'clear the project cache'")
+        .about("Look up sentry project slugs by id using the api")
+        .arg(
+            Arg::with_name("project_id")
+                .index(1)
+                .value_name("PROJECT-ID")
+                .help("The project id to look up")
+                .takes_value(true)
+                .required(true),
         )
+        .arg_from_usage("--clear-cache 'clear the project cache'")
         .get_matches();
 
     if let Some(matches) = matches.subcommand_matches("get-slug") {

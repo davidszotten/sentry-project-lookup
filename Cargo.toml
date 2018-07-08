@@ -1,5 +1,5 @@
 [package]
-name = "sentry-api"
+name = "sentry-project-lookup"
 version = "0.1.0"
 authors = ["David Szotten <davidszotten@gmail.com>"]
 

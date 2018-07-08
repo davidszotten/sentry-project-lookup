@@ -1,0 +1,12 @@
+[package]
+name = "sentry-api"
+version = "0.1.0"
+authors = ["David Szotten <davidszotten@gmail.com>"]
+
+[dependencies]
+clap = "*"
+hyper = "*"
+reqwest = "*"
+serde = "*"
+serde_derive = "*"
+serde_json = "*"

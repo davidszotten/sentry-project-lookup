@@ -9,7 +9,7 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 
-use app_dirs::{AppInfo, AppDataType, app_dir, get_app_dir};
+use app_dirs::{app_dir, get_app_dir, AppDataType, AppInfo};
 use clap::{App, Arg};
 use hyper::header::{Authorization, Bearer, Headers};
 use std::env;
@@ -17,8 +17,10 @@ use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 
-
-const APP_INFO: AppInfo = AppInfo{name: crate_name!(), author: crate_authors!()};
+const APP_INFO: AppInfo = AppInfo {
+    name: crate_name!(),
+    author: crate_authors!(),
+};
 
 const SENTRY_ORG: &str = "org";
 const PROJECT_CACHE_FILENAME: &str = "projects.json";
@@ -58,9 +60,7 @@ fn main() -> Result<(), Box<Error>> {
     }
 
     return Ok(());
-
 }
-
 
 fn get_slug(project_id: &str, clear_cache: bool) -> Result<String, Box<Error>> {
     let projects = get_projects(clear_cache)?;
@@ -85,7 +85,6 @@ fn get_projects(clear_cache: bool) -> Result<Vec<Project>, Box<Error>> {
     Ok(projects)
 }
 
-
 fn get_projects_from_api() -> Result<Vec<Project>, Box<Error>> {
     let api_key = match env::var("SENTRY_APIKEY") {
         Ok(val) => Ok(val),
@@ -99,10 +98,7 @@ fn get_projects_from_api() -> Result<Vec<Project>, Box<Error>> {
         "https://sentry.io/api/0/organizations/{}/projects/",
         SENTRY_ORG
     );
-    let mut res = client
-        .get(&url)
-        .headers(headers)
-        .send()?;
+    let mut res = client.get(&url).headers(headers).send()?;
 
     if !res.status().is_success() {
         let body = res.text()?;
@@ -124,7 +120,6 @@ fn set_cache(projects: &[Project]) -> Result<(), Box<Error>> {
     write!(file, "{}", contents)?;
     Ok(())
 }
-
 
 fn get_cache() -> Result<Vec<Project>, Box<Error>> {
     let cache_dir = get_app_dir(AppDataType::UserCache, &APP_INFO, "cache")?;

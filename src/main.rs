@@ -42,9 +42,16 @@ fn main() -> Result<(), Box<Error>> {
         .author(crate_authors!("\n"))
         .about("Look up sentry project slugs by id using the api")
         .arg(
-            Arg::with_name("project_id")
+            Arg::with_name("api-key")
+                .long("api-key")
+                .env("SENTRY_APIKEY")
+                .help("Sentry API key")
+                .takes_value(true)
+                .required(true),
+        )
+        .arg(
+            Arg::with_name("project-id")
                 .index(1)
-                .value_name("PROJECT-ID")
                 .help("The project id to look up")
                 .takes_value(true)
                 .required(true),
@@ -53,7 +60,7 @@ fn main() -> Result<(), Box<Error>> {
         .get_matches();
 
     if let Some(matches) = matches.subcommand_matches("get-slug") {
-        let project_id = matches.value_of("project_id").unwrap();
+        let project_id = matches.value_of("project-id").unwrap();
         let clear_cache = matches.is_present("clear-cache");
         let slug = get_slug(project_id, clear_cache)?;
         println!("{}", slug);

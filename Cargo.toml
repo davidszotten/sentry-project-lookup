@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["David Szotten <davidszotten@gmail.com>"]
 
 [dependencies]
+app_dirs = "1.2.1"
 clap = "*"
 hyper = "*"
 reqwest = "*"

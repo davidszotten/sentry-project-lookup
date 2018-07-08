@@ -1,3 +1,4 @@
+extern crate app_dirs;
 #[macro_use]
 extern crate clap;
 extern crate hyper;
@@ -5,21 +6,29 @@ extern crate reqwest;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
 extern crate serde_json;
 
+use app_dirs::{AppInfo, AppDataType, app_dir, get_app_dir};
 use clap::{App, Arg, SubCommand};
 use hyper::header::{Authorization, Bearer, Headers};
 use std::env;
 use std::error::Error;
+use std::fs::File;
+use std::io::prelude::*;
+
+
+const APP_INFO: AppInfo = AppInfo{name: "sentry-api", author: "David Szotten"};
 
 const SENTRY_ORG: &str = "org";
+const PROJECT_CACHE_FILENAME: &str = "projects.json";
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct Response {
     projects: Vec<Project>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct Project {
     id: String,
     slug: String,
@@ -48,12 +57,31 @@ fn main() -> Result<(), Box<Error>> {
         let slug = get_slug(project_id)?;
         println!("{}", slug);
     }
+
+    // get_cache()?;
     return Ok(());
 
 }
 
 
 fn get_slug(project_id: &str) -> Result<String, Box<Error>> {
+    let projects = get_projects()?;
+
+    for project in projects.iter() {
+        if project.id == project_id {
+            return Ok(project.slug.clone());
+        }
+    }
+
+    Err("Project not found")?
+}
+
+
+fn get_projects() -> Result<Vec<Project>, Box<Error>> {
+    if let Ok(projects) = get_cache() {
+        return Ok(projects);
+    }
+
     let api_key = match env::var("SENTRY_APIKEY") {
         Ok(val) => Ok(val),
         Err(_) => Err("SENTRY_APIKEY missing"),
@@ -77,14 +105,30 @@ fn get_slug(project_id: &str) -> Result<String, Box<Error>> {
     }
 
     let projects: Vec<Project> = res.json()?;
-    // println!("{:?}", projects);
 
-    for project in projects.iter() {
-        if project.id == project_id {
-            return Ok(project.slug.clone());
-            // println!("{}", project.slug);
-        }
-    }
+    set_cache(&projects)?;
+    Ok(projects)
+}
 
-    Err("Project not found")?
+fn set_cache(projects: &[Project]) -> Result<(), Box<Error>> {
+    let contents = json!(projects);
+
+    let cache_dir = app_dir(AppDataType::UserCache, &APP_INFO, "cache")?;
+    let filename = cache_dir.join(PROJECT_CACHE_FILENAME);
+    let mut file = File::create(filename)?;
+
+    write!(file, "{}", contents)?;
+    Ok(())
+}
+
+
+fn get_cache() -> Result<Vec<Project>, Box<Error>> {
+    let cache_dir = get_app_dir(AppDataType::UserCache, &APP_INFO, "cache")?;
+    let filename = cache_dir.join(PROJECT_CACHE_FILENAME);
+    let mut file = File::open(filename)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+    let projects = serde_json::from_str(&contents)?;
+
+    Ok(projects)
 }

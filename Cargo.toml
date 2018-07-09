@@ -6,6 +6,7 @@ authors = ["David Szotten <davidszotten@gmail.com>"]
 [dependencies]
 app_dirs = "1.2.1"
 clap = "*"
+failure = "*"
 hyper = "*"
 reqwest = "*"
 serde = "*"

@@ -8,11 +8,13 @@ extern crate serde;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+#[macro_use]
+extern crate failure;
 
 use app_dirs::{app_dir, get_app_dir, AppDataType, AppInfo};
 use clap::{App, Arg};
+use failure::Error;
 use hyper::header::{Authorization, Bearer, Headers};
-use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 
@@ -42,8 +44,18 @@ struct Options<'a> {
     clear_cache: bool,
 }
 
+#[derive(Fail, Debug)]
+#[fail(display = "Project not found")]
+pub struct ProjectNotFoundError;
 
-fn main() -> Result<(), Box<Error>> {
+#[derive(Fail, Debug)]
+#[fail(display = "Sentry API Error: {}", body)]
+pub struct SentryApiError {
+    body: String,
+}
+
+
+fn main() {
     let matches = App::new("Sentry project lookup")
         .version(crate_version!())
         .author(crate_authors!("\n"))
@@ -89,13 +101,14 @@ fn main() -> Result<(), Box<Error>> {
         org: matches.value_of("org").unwrap(),
         clear_cache: matches.is_present("clear-cache"),
     };
-    let slug = get_slug(project_id, &options)?;
+    let slug = get_slug(project_id, &options).unwrap_or_else(|err| {
+        println!("{}", err);
+        ::std::process::exit(1);
+    });
     println!("{}", slug);
-
-    return Ok(());
 }
 
-fn get_slug(project_id: &str, options: &Options) -> Result<String, Box<Error>> {
+fn get_slug(project_id: &str, options: &Options) -> Result<String, Error> {
     let projects = get_projects(options)?;
 
     for project in projects.iter() {
@@ -104,10 +117,10 @@ fn get_slug(project_id: &str, options: &Options) -> Result<String, Box<Error>> {
         }
     }
 
-    Err("Project not found")?
+    Err(ProjectNotFoundError)?
 }
 
-fn get_projects(options: &Options) -> Result<Vec<Project>, Box<Error>> {
+fn get_projects(options: &Options) -> Result<Vec<Project>, Error> {
     if !options.clear_cache {
         if let Ok(projects) = get_cache() {
             return Ok(projects);
@@ -118,7 +131,7 @@ fn get_projects(options: &Options) -> Result<Vec<Project>, Box<Error>> {
     Ok(projects)
 }
 
-fn get_projects_from_api(options: &Options) -> Result<Vec<Project>, Box<Error>> {
+fn get_projects_from_api(options: &Options) -> Result<Vec<Project>, Error> {
     let mut headers = Headers::new();
     headers.set(Authorization(Bearer { token: options.api_key.into() }));
     let client = reqwest::Client::new();
@@ -130,14 +143,14 @@ fn get_projects_from_api(options: &Options) -> Result<Vec<Project>, Box<Error>> 
 
     if !res.status().is_success() {
         let body = res.text()?;
-        return Err(body.into());
+        return Err(SentryApiError{ body: body})?;
     }
 
     let projects: Vec<Project> = res.json()?;
     Ok(projects)
 }
 
-fn set_cache(projects: &[Project]) -> Result<(), Box<Error>> {
+fn set_cache(projects: &[Project]) -> Result<(), Error> {
     let contents = json!(projects);
 
     let cache_dir = app_dir(AppDataType::UserCache, &APP_INFO, "cache")?;
@@ -148,7 +161,7 @@ fn set_cache(projects: &[Project]) -> Result<(), Box<Error>> {
     Ok(())
 }
 
-fn get_cache() -> Result<Vec<Project>, Box<Error>> {
+fn get_cache() -> Result<Vec<Project>, Error> {
     let cache_dir = get_app_dir(AppDataType::UserCache, &APP_INFO, "cache")?;
     let filename = cache_dir.join(PROJECT_CACHE_FILENAME);
     let mut file = File::open(filename)?;

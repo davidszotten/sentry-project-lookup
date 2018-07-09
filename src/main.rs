@@ -12,7 +12,6 @@ extern crate serde_json;
 use app_dirs::{app_dir, get_app_dir, AppDataType, AppInfo};
 use clap::{App, Arg};
 use hyper::header::{Authorization, Bearer, Headers};
-use std::env;
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
@@ -22,7 +21,6 @@ const APP_INFO: AppInfo = AppInfo {
     author: crate_authors!(),
 };
 
-const SENTRY_ORG: &str = "org";
 const PROJECT_CACHE_FILENAME: &str = "projects.json";
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -35,6 +33,15 @@ struct Project {
     id: String,
     slug: String,
 }
+
+#[derive(Debug)]
+struct Options<'a> {
+    api_key: &'a str,
+    api_url: &'a str,
+    org: &'a str,
+    clear_cache: bool,
+}
+
 
 fn main() -> Result<(), Box<Error>> {
     let matches = App::new("Sentry project lookup")
@@ -50,6 +57,22 @@ fn main() -> Result<(), Box<Error>> {
                 .required(true),
         )
         .arg(
+            Arg::with_name("api-url")
+                .long("api-url")
+                .env("SENTRY_URL")
+                .help("Sentry API url")
+                .takes_value(true)
+                .default_value("https://sentry.io"),
+        )
+        .arg(
+            Arg::with_name("org")
+                .long("org")
+                .env("SENTRY_ORG")
+                .help("Sentry organisation")
+                .takes_value(true)
+                .required(true)
+        )
+        .arg(
             Arg::with_name("project-id")
                 .index(1)
                 .help("The project id to look up")
@@ -59,18 +82,21 @@ fn main() -> Result<(), Box<Error>> {
         .arg_from_usage("--clear-cache 'clear the project cache'")
         .get_matches();
 
-    if let Some(matches) = matches.subcommand_matches("get-slug") {
-        let project_id = matches.value_of("project-id").unwrap();
-        let clear_cache = matches.is_present("clear-cache");
-        let slug = get_slug(project_id, clear_cache)?;
-        println!("{}", slug);
-    }
+    let project_id = matches.value_of("project-id").unwrap();
+    let options = Options {
+        api_key: matches.value_of("api-key").unwrap(),
+        api_url: matches.value_of("api-url").unwrap(),
+        org: matches.value_of("org").unwrap(),
+        clear_cache: matches.is_present("clear-cache"),
+    };
+    let slug = get_slug(project_id, &options)?;
+    println!("{}", slug);
 
     return Ok(());
 }
 
-fn get_slug(project_id: &str, clear_cache: bool) -> Result<String, Box<Error>> {
-    let projects = get_projects(clear_cache)?;
+fn get_slug(project_id: &str, options: &Options) -> Result<String, Box<Error>> {
+    let projects = get_projects(options)?;
 
     for project in projects.iter() {
         if project.id == project_id {
@@ -81,29 +107,24 @@ fn get_slug(project_id: &str, clear_cache: bool) -> Result<String, Box<Error>> {
     Err("Project not found")?
 }
 
-fn get_projects(clear_cache: bool) -> Result<Vec<Project>, Box<Error>> {
-    if !clear_cache {
+fn get_projects(options: &Options) -> Result<Vec<Project>, Box<Error>> {
+    if !options.clear_cache {
         if let Ok(projects) = get_cache() {
             return Ok(projects);
         }
     }
-    let projects = get_projects_from_api()?;
+    let projects = get_projects_from_api(options)?;
     set_cache(&projects)?;
     Ok(projects)
 }
 
-fn get_projects_from_api() -> Result<Vec<Project>, Box<Error>> {
-    let api_key = match env::var("SENTRY_APIKEY") {
-        Ok(val) => Ok(val),
-        Err(_) => Err("SENTRY_APIKEY missing"),
-    }?;
-
+fn get_projects_from_api(options: &Options) -> Result<Vec<Project>, Box<Error>> {
     let mut headers = Headers::new();
-    headers.set(Authorization(Bearer { token: api_key }));
+    headers.set(Authorization(Bearer { token: options.api_key.into() }));
     let client = reqwest::Client::new();
     let url = format!(
-        "https://sentry.io/api/0/organizations/{}/projects/",
-        SENTRY_ORG
+        "{}/api/0/organizations/{}/projects/",
+        options.api_url, options.org,
     );
     let mut res = client.get(&url).headers(headers).send()?;
 
@@ -112,7 +133,6 @@ fn get_projects_from_api() -> Result<Vec<Project>, Box<Error>> {
         return Err(body.into());
     }
 
-    // res.json()?
     let projects: Vec<Project> = res.json()?;
     Ok(projects)
 }

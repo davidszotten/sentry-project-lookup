@@ -110,7 +110,7 @@ fn main() {
 fn get_slug(project_id: &str, options: &Options) -> Result<String, Error> {
     let projects = get_projects(options)?;
 
-    for project in projects.iter() {
+    for project in &projects {
         if project.id == project_id {
             return Ok(project.slug.clone());
         }
@@ -144,7 +144,7 @@ fn get_projects_from_api(options: &Options) -> Result<Vec<Project>, Error> {
 
     if !res.status().is_success() {
         let body = res.text()?;
-        return Err(SentryApiError { body: body })?;
+        return Err(SentryApiError { body })?;
     }
 
     let projects: Vec<Project> = res.json()?;

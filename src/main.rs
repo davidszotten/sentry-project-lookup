@@ -54,7 +54,6 @@ pub struct SentryApiError {
     body: String,
 }
 
-
 fn main() {
     let matches = App::new("Sentry project lookup")
         .version(crate_version!())
@@ -82,7 +81,7 @@ fn main() {
                 .env("SENTRY_ORG")
                 .help("Sentry organisation")
                 .takes_value(true)
-                .required(true)
+                .required(true),
         )
         .arg(
             Arg::with_name("project-id")
@@ -133,7 +132,9 @@ fn get_projects(options: &Options) -> Result<Vec<Project>, Error> {
 
 fn get_projects_from_api(options: &Options) -> Result<Vec<Project>, Error> {
     let mut headers = Headers::new();
-    headers.set(Authorization(Bearer { token: options.api_key.into() }));
+    headers.set(Authorization(Bearer {
+        token: options.api_key.into(),
+    }));
     let client = reqwest::Client::new();
     let url = format!(
         "{}/api/0/organizations/{}/projects/",
@@ -143,7 +144,7 @@ fn get_projects_from_api(options: &Options) -> Result<Vec<Project>, Error> {
 
     if !res.status().is_success() {
         let body = res.text()?;
-        return Err(SentryApiError{ body: body})?;
+        return Err(SentryApiError { body: body })?;
     }
 
     let projects: Vec<Project> = res.json()?;
